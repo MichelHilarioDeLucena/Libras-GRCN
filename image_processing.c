@@ -54,47 +54,13 @@ bmp_image *load_bmp(char *path) {
     if (hdr->data_offset > 54)
       fseek(img_file, hdr->data_offset - 54, SEEK_CUR);
     size_t ret = fread(bmp->pixels, 1, image_size, img_file);
-    norm_img(bmp);
+    norm_img_bmp(bmp);
 
   } else
     perror("ERRO ao encontrar arquivo.\n");
 
   fclose(img_file);
   return bmp;
-}
-
-void norm_img(bmp_image *bmp) {
-  size_t k = 0;
-  float scale = 1.0 / 255;
-  uint32_t h = bmp->info.header_bmp.height;
-  for (int i = h - 1, j; i >= 0; i--)
-    for (j = 0; j < bmp->n_channels; j += 3, k++) {
-      int index = i * bmp->pw_padded + j;
-      uint8_t red = bmp->pixels[index + 2];
-      uint8_t green = bmp->pixels[index + 1];
-      uint8_t blue = bmp->pixels[index];
-      float norm = (0.299 * red + 0.587 * green + 0.114 * blue);
-      bmp->hist_n[(uint8_t)(norm + .5)]++;
-      bmp->ot_pixels[k] = norm * scale;
-      bmp->t_pixels[k] = bmp->ot_pixels[k];
-    }
-}
-void norm_img_raw(bmp_image *bmp) {
-  size_t k = 0;
-  uint32_t h = bmp->info.header_bmp.height;
-  for (int i = 0, j; i < h; i++)
-    for (j = 0; j < bmp->n_channels; j += 3, k++) {
-      int index = i * bmp->pw_padded + j;
-      uint8_t red = bmp->pixels[index + 2];
-      uint8_t green = bmp->pixels[index + 1];
-      uint8_t blue = bmp->pixels[index];
-      uint8_t norm =
-          (uint8_t)round(0.299f * red + 0.587f * green + 0.114f * blue);
-
-      bmp->t_raw_pixels[index] = norm;
-      bmp->t_raw_pixels[index + 1] = norm;
-      bmp->t_raw_pixels[index + 2] = norm;
-    }
 }
 
 void create_copy_bmp(bmp_image *bmp, char *name_file) {
@@ -159,36 +125,84 @@ void create_bmp(const char *name_file, uint8_t *bytes, uint32_t w, uint32_t h) {
   free(h_bmp);
 }
 
-float *create_buffer(uint32_t iw, uint32_t ih, uint32_t fsize) {
-  return malloc(sizeof(float) * iw * ih);
+void norm_img(image_prcss *img) {
+  size_t k = 0;
+  float scale = 1.0 / 255;
+  uint32_t h = img->height;
+  for (int i = h - 1, j; i >= 0; i--)
+    for (j = 0; j < img->n_channels; j += 3, k++) {
+      int index = i * img->pw_padded + j;
+      uint8_t red = img->pixels[index + 2];
+      uint8_t green = img->pixels[index + 1];
+      uint8_t blue = img->pixels[index];
+      float norm = (0.299 * red + 0.587 * green + 0.114 * blue);
+      img->hist_n[(uint8_t)(norm + .5)]++;
+      img->ot_pixels[k] = norm * scale;
+      img->t_pixels[k] = img->ot_pixels[k];
+    }
+}
+void norm_img_bmp(bmp_image *img){
+  size_t k = 0;
+  float scale = 1.0 / 255;
+  uint32_t h = img->info.header_bmp.height;
+  for (int i = h - 1, j; i >= 0; i--)
+    for (j = 0; j < img->n_channels; j += 3, k++) {
+      int index = i * img->pw_padded + j;
+      uint8_t red = img->pixels[index + 2];
+      uint8_t green = img->pixels[index + 1];
+      uint8_t blue = img->pixels[index];
+      float norm = (0.299 * red + 0.587 * green + 0.114 * blue);
+      img->hist_n[(uint8_t)(norm + .5)]++;
+      img->ot_pixels[k] = norm * scale;
+      img->t_pixels[k] = img->ot_pixels[k];
+    }
+}
+void norm_img_raw(image_prcss *img)
+{
+    size_t k = 0;
+    uint32_t h = img->height;
+    for (int i = 0, j; i < h; i++)
+        for (j = 0; j < img->n_channels; j += 3, k++)
+        {
+            int index = i * img->pw_padded + j;
+            uint8_t red = img->pixels[index + 2];
+            uint8_t green = img->pixels[index + 1];
+            uint8_t blue = img->pixels[index];
+            uint8_t norm =
+                (uint8_t)round(0.299f * red + 0.587f * green + 0.114f * blue);
+
+            img->t_raw_pixels[index] = norm;
+            img->t_raw_pixels[index + 1] = norm;
+            img->t_raw_pixels[index + 2] = norm;
+        }
 }
 
-void set_lut(bmp_image *bmp, float *lut) { bmp->lut = lut; }
+void set_lut(image_prcss *img, float *lut) { img->lut = lut; }
 
-void reset_transform(bmp_image *bmp) {
-  if (bmp->lut)
-    memset(bmp->lut, 0, sizeof(float) * 256);
-  for (size_t i = 0; i < bmp->n_pixels; i++)
-    bmp->t_pixels[i] = bmp->ot_pixels[i];
+void reset_transform(image_prcss *img) {
+  if (img->lut)
+    memset(img->lut, 0, sizeof(float) * 256);
+  for (size_t i = 0; i < img->n_pixels; i++)
+    img->t_pixels[i] = img->ot_pixels[i];
 }
 
-void compute_statistics(bmp_image *bmp) {
+void compute_statistics(image_prcss *img) {
   for (size_t k = 0; k < 256; k++)
-    bmp->pdf_n[k] = bmp->hist_n[k] / (float)bmp->n_pixels;
+    img->pdf_n[k] = img->hist_n[k] / (float)img->n_pixels;
 }
 
-void equalize_histogram(bmp_image *bmp) {
-  compute_statistics(bmp);
+void equalize_histogram(image_prcss *img) {
+  compute_statistics(img);
   float acc_n = 0;
   for (size_t k = 0; k < 256; k++) {
-    acc_n += bmp->pdf_n[k];
-    bmp->lut[k] = acc_n;
+    acc_n += img->pdf_n[k];
+    img->lut[k] = acc_n;
   }
 }
 
-void apply_lut(bmp_image *bmp) {
-  for (size_t i = 0; i < bmp->n_pixels; i++)
-    bmp->t_pixels[i] = bmp->lut[(uint8_t)(bmp->t_pixels[i] * 255)];
+void apply_lut(image_prcss *img) {
+  for (size_t i = 0; i < img->n_pixels; i++)
+    img->t_pixels[i] = img->lut[(uint8_t)(img->t_pixels[i] * 255)];
 }
 
 void build_gamma_lut(float *lut, float gamma) {
@@ -202,11 +216,11 @@ void build_log_lut(float *lut) {
     lut[i] = c * log(1 + i);
 }
 
-void contrast_stretch(bmp_image *bmp) {
+void contrast_stretch(image_prcss *img) {
   float min = 1, max = 0;
-  for (size_t i = 0; i < bmp->n_pixels; i++)
-    min = bmp->t_pixels[i] < min ? bmp->t_pixels[i] : min,
-    max = bmp->t_pixels[i] > max ? bmp->t_pixels[i] : max;
+  for (size_t i = 0; i < img->n_pixels; i++)
+    min = img->t_pixels[i] < min ? img->t_pixels[i] : min,
+    max = img->t_pixels[i] > max ? img->t_pixels[i] : max;
   min *= 255.0;
   max *= 255.0;
   if (max == min)
@@ -214,26 +228,26 @@ void contrast_stretch(bmp_image *bmp) {
   float k = 1.0 / (max - min);
 
   for (size_t i = 0; i < 256; i++)
-    bmp->lut[i] = i >= min && i <= max ? k * (i - min) : i > min;
+    img->lut[i] = i >= min && i <= max ? k * (i - min) : i > min;
 }
 
-void apply_otsu_threshold(bmp_image *bmp) {
-  compute_statistics(bmp);
+void apply_otsu_threshold(image_prcss *img) {
+  compute_statistics(img);
 
   float mi_total = 0, wb = 0, sb = 0, max_var = 0, var, wo, mi_b, mi_f;
 
   uint8_t lim = 0;
 
   for (size_t i = 0; i < 256; i++)
-    mi_total += bmp->pdf_n[i] * i;
+    mi_total += img->pdf_n[i] * i;
   for (size_t i = 0; i < 256; i++) {
-    wb += bmp->pdf_n[i];
+    wb += img->pdf_n[i];
     wo = 1.0 - wb;
     if (wo < 1.e-8)
       break;
     if (wb < 1.e-8)
       continue;
-    sb += bmp->pdf_n[i] * i;
+    sb += img->pdf_n[i] * i;
     mi_b = sb / wb;
     mi_f = (mi_total - sb) / wo;
     var = wb * wo * (mi_b - mi_f) * (mi_b - mi_f);
@@ -241,13 +255,13 @@ void apply_otsu_threshold(bmp_image *bmp) {
     if (max_var < var)
       lim = i, max_var = var;
   }
-  for (size_t i = 0; i < bmp->n_pixels; i++)
-    bmp->t_pixels[i] = (uint8_t)(bmp->t_pixels[i] * 255) > lim;
+  for (size_t i = 0; i < img->n_pixels; i++)
+    img->t_pixels[i] = (uint8_t)(img->t_pixels[i] * 255) > lim;
 }
 
-void convolution2D(bmp_image *bmp, float *filter, float *buffer, uint32_t k) {
-  uint32_t w = bmp->info.header_bmp.width;
-  uint32_t h = bmp->info.header_bmp.height;
+void convolution2D(image_prcss *img, float *filter, float *buffer, uint32_t k) {
+  uint32_t w = img->width;
+  uint32_t h = img->height;
 
   size_t r = k / 2;
   for (int i = 0, j; i < h; i++)
@@ -259,15 +273,15 @@ void convolution2D(bmp_image *bmp, float *filter, float *buffer, uint32_t k) {
           int32_t nc = (n < w - 1 ? n : w - 1), mc = (m < h - 1 ? m : h - 1);
           nc *= nc > 0;
           mc *= mc > 0;
-          value += bmp->t_pixels[mc * w + nc] * filter[index_f];          
+          value += img->t_pixels[mc * w + nc] * filter[index_f];          
         }
       buffer[i * w + j] = value;
     }
 }
 
-void convolution1D(bmp_image *bmp, float *k_x, float *k_y, float *buffer,uint32_t k) {
-  int32_t w = bmp->info.header_bmp.width;
-  int32_t h = bmp->info.header_bmp.height;
+void convolution1D(image_prcss *img, float *k_x, float *k_y, float *buffer,uint32_t k) {
+  int32_t w = img->width;
+  int32_t h = img->height;
   int32_t r = k / 2;
   float *temp = malloc(sizeof(float) * w * h);
 
@@ -279,7 +293,7 @@ void convolution1D(bmp_image *bmp, float *k_x, float *k_y, float *buffer,uint32_
 
         int32_t mc = m < w ? m : (w - 1);
         mc *= mc >= 0;
-        value += bmp->t_pixels[i * w + mc] * k_x[index_f];
+        value += img->t_pixels[i * w + mc] * k_x[index_f];
       }
       temp[i * w + j] = value;
     }
@@ -332,31 +346,31 @@ float *new_gauss_filterl1D(uint32_t k, float sig) {
   return kernel;
 }
 
-void apply_gaussian_2D(bmp_image *bmp, uint32_t k, float *buffer, float *filter) {
-  convolution2D(bmp, filter, buffer, k);
+void apply_gaussian_2D(image_prcss *img, uint32_t k, float *buffer, float *filter) {
+  convolution2D(img, filter, buffer, k);
 
-  uint32_t w = bmp->info.header_bmp.width;
-  uint32_t h = bmp->info.header_bmp.height;
+  uint32_t w = img->width;
+  uint32_t h = img->height;
   uint32_t r = k / 2;
 
   for (uint32_t i = 0; i < h; i++) {
     for (uint32_t j = 0; j < w; j++) {
       uint32_t idx_buf = i * w + j;
       uint32_t idx_img = i * w + j;
-      bmp->t_pixels[idx_img] = buffer[idx_buf];
+      img->t_pixels[idx_img] = buffer[idx_buf];
     }
   }
 }
 
-void apply_sobel_2D(bmp_image *bmp, float *buffer, float *gx,
+void apply_sobel_2D(image_prcss *img, float *buffer, float *gx,
                     float *gy) {
   static float sobelx[] = {1, 0, -1, 2, 0, -2, 1, 0, -1};
   static float sobely[] = {1, 2, 1, 0, 0, 0, -1, -2, -1};
-  convolution2D(bmp, sobelx, gx, 3);
-  convolution2D(bmp, sobely, gy, 3);
+  convolution2D(img, sobelx, gx, 3);
+  convolution2D(img, sobely, gy, 3);
 
-  uint32_t w = bmp->info.header_bmp.width;
-  uint32_t h = bmp->info.header_bmp.height;
+  uint32_t w = img->width;
+  uint32_t h = img->height;
   uint32_t r = 1;  
   uint32_t total = w * h;
 
@@ -373,39 +387,39 @@ void apply_sobel_2D(bmp_image *bmp, float *buffer, float *gx,
     for (uint32_t j = 0; j < w; j++) {
       uint32_t idx_buf = i * w + j;
       uint32_t idx_img = i * w + j;
-      bmp->t_pixels[idx_img] = inv_max * buffer[idx_buf];
+      img->t_pixels[idx_img] = inv_max * buffer[idx_buf];
     }
 }
 
-void apply_gaussian_1D(bmp_image *bmp, uint32_t k,
+void apply_gaussian_1D(image_prcss *img, uint32_t k,
                        float *buffer, float *k_x, float *k_y) {
-  convolution1D(bmp, k_x, k_y, buffer, k);
+  convolution1D(img, k_x, k_y, buffer, k);
 
-  uint32_t w = bmp->info.header_bmp.width;
-  uint32_t h = bmp->info.header_bmp.height;
+  uint32_t w = img->width;
+  uint32_t h = img->height;
 
   for (uint32_t i = 0; i < w; i++) {
     for (uint32_t j = 0; j < w; j++) {
       uint32_t idx_buf = i * w + j;
       uint32_t idx_img = (i + 0) * w + (j + 0);
-      bmp->t_pixels[idx_img] = buffer[idx_buf];
+      img->t_pixels[idx_img] = buffer[idx_buf];
     }
   }
 }
 
-void apply_sobel_1D(bmp_image *bmp, float *buffer, float *gx,
+void apply_sobel_1D(image_prcss *img, float *buffer, float *gx,
                     float *gy) {
-  uint32_t k = 5;
-  static float deriv_h[] = {1, 0, 0, 0, -1};
-  static float deriv_v[] = {1, 0, 0, 0, -1};
-  static float smooth_v[] = {1, 2, 3, 2, 1};
-  static float smooth_h[] = {1, 2, 3, 2, 1};
+  uint32_t k = 3;
+  static float deriv_h[]  = {1, 0,-1};
+  static float deriv_v[]  = {1, 0,-1};
+  static float smooth_v[] = {1, 2, 1};
+  static float smooth_h[] = {1, 2, 1};
 
-  convolution1D(bmp, deriv_h, smooth_v, gx, k);
-  convolution1D(bmp, smooth_h, deriv_v, gy, k);
+  convolution1D(img, deriv_h, smooth_v, gx, k);
+  convolution1D(img, smooth_h, deriv_v, gy, k);
 
-  uint32_t w = bmp->info.header_bmp.width;
-  uint32_t h = bmp->info.header_bmp.height;
+  uint32_t w = img->width;
+  uint32_t h = img->height;
   uint32_t total = w * h;
   uint32_t r = 1;
 
@@ -422,11 +436,11 @@ void apply_sobel_1D(bmp_image *bmp, float *buffer, float *gx,
     for (uint32_t j = 0; j < w; j++) {
       uint32_t idx_buf = i * w + j;
       uint32_t idx_img = i * w + j;
-      bmp->t_pixels[idx_img] = inv_max * buffer[idx_buf];
+      img->t_pixels[idx_img] = inv_max * buffer[idx_buf];
     }
 }
 
-void apply_canny(bmp_image *bmp, float *gx, float *gy, float t_high, float t_low) {
+void apply_canny(image_prcss *img, float *gx, float *gy, float t_high, float t_low) {
 
   static float deriv_h[] = {1, 0, -1};
   static float smooth_v[] = {1, 2, 1};
@@ -438,8 +452,8 @@ void apply_canny(bmp_image *bmp, float *gx, float *gy, float t_high, float t_low
   static int32_t dir_y[]={1,-1,0, 0,1,-1, 1,-1};
   
 
-  uint32_t w = bmp->info.header_bmp.width;
-  uint32_t h = bmp->info.header_bmp.height;
+  uint32_t w = img->width;
+  uint32_t h = img->height;
   uint32_t total = w*h;
   uint32_t r = 1;
 
@@ -448,8 +462,8 @@ void apply_canny(bmp_image *bmp, float *gx, float *gy, float t_high, float t_low
 
   
 
-  convolution1D(bmp, deriv_h, smooth_v, gx, 3);
-  convolution1D(bmp, smooth_h, deriv_v, gy, 3);
+  convolution1D(img, deriv_h, smooth_v, gx, 3);
+  convolution1D(img, smooth_h, deriv_v, gy, 3);
 
   float max = -INFINITY;
   float rad_grad = 180.f / 3.14159265f;
@@ -461,7 +475,7 @@ void apply_canny(bmp_image *bmp, float *gx, float *gy, float t_high, float t_low
   }
   t_low *= max;
   t_high *= max;
-  memset(bmp->t_pixels, 0, w * h * sizeof(float));
+  memset(img->t_pixels, 0, w * h * sizeof(float));
   for (int i_y = 1; i_y < h-1; i_y++) {
     for (int i_x = 1; i_x < w-1; i_x++) {
       int i = i_y * w + i_x;
@@ -485,9 +499,9 @@ void apply_canny(bmp_image *bmp, float *gx, float *gy, float t_high, float t_low
       int idx_img = i_y * w + i_x;
       if (mag[i] >= before && mag[i] >= after) {
         float val = mag[i];
-        bmp->t_pixels[idx_img]=val >= t_high?1 :val >= t_low ? .5f : 0.f ;
+        img->t_pixels[idx_img]=val >= t_high?1 :val >= t_low ? .5f : 0.f ;
       } else
-        bmp->t_pixels[idx_img] = 0;
+        img->t_pixels[idx_img] = 0;
     }
   }
   int32_t *stack_x = malloc(total * sizeof(int32_t));
@@ -498,7 +512,7 @@ void apply_canny(bmp_image *bmp, float *gx, float *gy, float t_high, float t_low
   for (int i_y = 0; i_y < h; i_y++) 
     for (int i_x = 0; i_x < w; i_x++) {
       int32_t idx=i_y * w + i_x;
-      if(bmp->t_pixels[ idx]<1)continue;
+      if(img->t_pixels[ idx]<1)continue;
       stack_x[0]=i_x;
       stack_y[0]=i_y;
       visited[idx] = 1;
@@ -513,9 +527,9 @@ void apply_canny(bmp_image *bmp, float *gx, float *gy, float t_high, float t_low
           int32_t neighb=ty*w+tx;          
           if( tx<0 && ty<0 && tx>=w && ty>=h)continue;
 
-          if(!visited[idx] && bmp->t_pixels[neighb]==.5f){
+          if(!visited[idx] && img->t_pixels[neighb]==.5f){
             visited[idx]=1;
-            bmp->t_pixels[neighb]=1.f;
+            img->t_pixels[neighb]=1.f;
             stack_x[top]=tx;
             stack_y[top]=ty;
             top++;
@@ -525,8 +539,8 @@ void apply_canny(bmp_image *bmp, float *gx, float *gy, float t_high, float t_low
     }
 
   for (uint32_t i = 0; i < total; i++) 
-    if (bmp->t_pixels[i] == 0.5f) 
-        bmp->t_pixels[i] = 0.0f;
+    if (img->t_pixels[i] == 0.5f) 
+        img->t_pixels[i] = 0.0f;
     
   free(mag);
   free(ang);
@@ -544,27 +558,27 @@ void build_sigmoid_lut(float *lut, float c, float m) {
   }
 }
 
-void print_bmp(bmp_image *bmp) {
+void print_img(image_prcss *img) {
   puts("\x1b[45mdisplay image\x1b[0m\n");
-  uint32_t w = bmp->pw_padded;
-  uint32_t h = bmp->info.header_bmp.height;
+  uint32_t w = img->pw_padded;
+  uint32_t h = img->height;
 
   for (int i = h - 1, j; i >= 0; i--) {
-    for (j = 0; j < bmp->n_channels; j += 3) {
+    for (j = 0; j < img->n_channels; j += 3) {
       int index = i * w + j;
-      uint8_t red = bmp->pixels[index + 2];
-      uint8_t green = bmp->pixels[index + 1];
-      uint8_t blue = bmp->pixels[index];
+      uint8_t red = img->pixels[index + 2];
+      uint8_t green = img->pixels[index + 1];
+      uint8_t blue = img->pixels[index];
       printf("\x1b[48;2;%u;%u;%um  ", red, green, blue);
     }
     puts("\033[0m");
   }
   puts("\n");
-  w = bmp->info.header_bmp.width;
+  w = img->width;
   for (int i = 0, j; i < h; i++) {
     for (j = 0; j < w; j++) {
       int index = i * w + j;
-      uint32_t gray = bmp->t_pixels[index] * 255;
+      uint32_t gray = img->t_pixels[index] * 255;
       printf("\x1b[48;2;%u;%u;%um  ", gray, gray, gray);
     }
     puts("\033[0m");
