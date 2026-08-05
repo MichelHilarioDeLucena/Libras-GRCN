@@ -1,0 +1,18 @@
+# Arquivos compilados
+*.out
+*.exe
+*.o
+*.obj
+*.a
+*.so
+*.dll
+*.dylib
+
+# Executáveis comuns
+program
+a.out
+a.exe
+main
+main.exe
+meu-programa
+meu-programa.exe

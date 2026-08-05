@@ -45,45 +45,47 @@ typedef struct bmp_image {
 
 bmp_image *load_bmp(char *path);
 void create_copy_bmp(bmp_image *img, char *name_file);
-void norm_img(bmp_image *bmp);
-void norm_img_raw(bmp_image *bmp);
 void create_bmp(const char *name_file, uint8_t *bytes, uint32_t w, uint32_t h);
-float *create_buffer(uint32_t iw, uint32_t ih, uint32_t fsize);
 
-void set_lut(bmp_image *bmp, float *lut);
-void apply_lut(bmp_image *bmp);
-void reset_transform(bmp_image *bmp);
-void compute_statistics(bmp_image *bmp);
-void equalize_histogram(bmp_image *bmp);
+void norm_img(image_prcss *img);
+void norm_img_bmp(bmp_image *img);
+void norm_img_raw(image_prcss *img);
+
+void set_lut(image_prcss *img, float *lut);
+void apply_lut(image_prcss *img);
+void reset_transform(image_prcss *img);
+void compute_statistics(image_prcss *img);
+void equalize_histogram(image_prcss *img);
 
 void build_gamma_lut(float *lut, float gamma);
 void build_log_lut(float *lut);
 void build_sigmoid_lut(float *lut, float c, float m);
-void contrast_stretch(bmp_image *bmp);
-void apply_otsu_threshold(bmp_image *bmp);
+void contrast_stretch(image_prcss *img);
+void apply_otsu_threshold(image_prcss *img);
 
-void convolution2D(bmp_image *bmp, float *filter, float *buffer, uint32_t k);
+void convolution2D(image_prcss *img, float *filter, float *buffer, uint32_t k);
 
-void convolution1D(bmp_image *bmp, float *k_x, float *k_y, float *buffer,
+void convolution1D(image_prcss *img, float *k_x, float *k_y, float *buffer,
                    uint32_t k);
 
-void apply_sobel_2D(bmp_image *bmp, float *buffer, float *gx,
+void apply_sobel_2D(image_prcss *img, float *buffer, float *gx,
                     float *gy);
 
-void apply_sobel_1D(bmp_image *bmp, float *buffer, float *gx,
+void apply_sobel_1D(image_prcss *img, float *buffer, float *gx,
                     float *gy);
 
-void apply_gaussian_2D(bmp_image *bmp, uint32_t k,
+void apply_gaussian_2D(image_prcss *img, uint32_t k,
                        float *buffer, float *filter);
 
-void apply_gaussian_1D(bmp_image *bmp, uint32_t k,
+void apply_gaussian_1D(image_prcss *img, uint32_t k,
                        float *buffer, float *k_x, float *k_y);
 
-void apply_canny(bmp_image *bmp, float *gx,float *gy, float t_high, float t_low);
+void apply_canny(image_prcss *img, float *gx,float *gy, float t_high, float t_low);
             
 float *new_gauss_filterl2D(uint32_t k, float sig);
 float *new_gauss_filterl1D(uint32_t k, float sig);
-void print_bmp(bmp_image *bmp);
-void destroy_bmp(bmp_image *bmp);
+void print_img(image_prcss *img);
+void destroy_img(image_prcss *img);
+void destroy_img_prcss(image_prcss *img);
 
 #endif

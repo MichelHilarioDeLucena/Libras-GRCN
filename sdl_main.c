@@ -30,23 +30,7 @@ int main() {
   SDL_Event event;
 
   SDL_Renderer *renderer = SDL_CreateRenderer(window, NULL);
-  if (!renderer) {
-    printf("Erro ao carregar renderer: %s\n", SDL_GetError());
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
-    SDL_Quit();
-    return 1;
-  }
 
-  SDL_Surface *surface =
-      SDL_LoadPNG_IO(SDL_IOFromFile("Cristo_Redentor.png", "rb"), true);
-  if (!surface) {
-    printf("Erro ao carregar imagem: %s\n", SDL_GetError());
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
-    SDL_Quit();
-    return 1;
-  }
 
   SDL_Texture *texture = NULL;
   int32_t device_count = 0;
@@ -78,14 +62,14 @@ int main() {
   uint64_t timestamp = 0;
   SDL_Surface *frame = SDL_AcquireCameraFrame(camera, &timestamp);
 
-  float *buffer = malloc(n_pixels * sizeof(float));
-  float *gx = create_buffer(width, height, 3);
-  float *gy = create_buffer(width, height, 3);
+  float *buffer = calloc(sizeof(float),n_pixels);
+  float *gx = calloc(sizeof(float),n_pixels);
+  float *gy = calloc(sizeof(float),n_pixels);
   uint32_t k_gauss = 5;
   float *gauss_f = new_gauss_filterl1D(k_gauss, 1.5f);
   
 
-  bmp_image img = {.n_channels = width * 3,
+  image_prcss img = {.n_channels = width * 3,
                    .n_pixels = n_pixels,
                    .pw_padded = stride,
                    .pixels = malloc(image_size),
@@ -94,8 +78,8 @@ int main() {
                    .t_raw_pixels = calloc(image_size, 1),
                    .lut = calloc(256, sizeof(float))};
 
-  img.info.header_bmp.width = width;
-  img.info.header_bmp.height = height;
+  img.width = width;
+  img.height = height;
   int state = 3;
   while (run) {
     while (SDL_PollEvent(&event)) {
@@ -145,7 +129,7 @@ int main() {
           apply_gaussian_1D(&img, k_gauss, buffer, gauss_f, gauss_f);
           apply_canny(&img, gx, gy, .1, .01);
         }
-        uint32_t h = img.info.header_bmp.height, k = 0;
+        uint32_t h = img.height, k = 0;
         for (int i = 0, j; i < h; i++)
           for (j = 0, k = 0; j < img.n_channels; j += 3, k++) {
             int index = i * img.pw_padded + j;
@@ -172,7 +156,6 @@ int main() {
   SDL_CloseCamera(camera);
   SDL_free(devices);
   SDL_DestroyTexture(texture);
-  SDL_DestroySurface(surface);
   SDL_DestroyRenderer(renderer);
   SDL_DestroyWindow(window);
   SDL_Quit();
